@@ -3,6 +3,11 @@
 
 #include <QObject>
 #include <escposexports.h>
+#ifdef Q_OS_WINDOWS
+#include <Windows.h>
+#endif
+
+#define LINE_WIDTH 32 // TODO: get print boundaries from device
 
 class QIODevice;
 class QTextCodec;
@@ -12,9 +17,19 @@ namespace EscPosQt {
 class ESC_POS_QT_EXPORT EscPosPrinter : public QObject
 {
     Q_OBJECT
+private:
+    struct _feed { int _lines; };
+    struct _lineSpacing { int mils; };
+    struct _2CTable {const QString &lColumn; const QString &rColumn;};
 public:
-    explicit EscPosPrinter(QIODevice *device, QObject *parent = nullptr);
-    explicit EscPosPrinter(QIODevice *device, const QByteArray &codecName, QObject *parent = nullptr);
+    explicit EscPosPrinter(const QString &printerName, const QByteArray &codecName = QByteArray(), QObject *parent = nullptr);
+    ~EscPosPrinter();
+    bool open();
+    void close();
+    bool startSpool(const QString &jobName = QString());
+    void endSpool();
+    bool startPage();
+    void endPage();
 
     struct QRCode {
         enum Model {
@@ -71,20 +86,19 @@ public:
     };
     Q_ENUM(Encoding)
 
-    struct _feed { int _lines; };
     inline static _feed feed(int __lines) { return { __lines }; }
+    inline static _lineSpacing lineSpacing(int mils) { return { mils }; }
+    inline static _2CTable formatAs2CTable(const QString &lColumn, const QString &rColumn) { return {lColumn, rColumn}; }
 
     EscPosPrinter &operator<<(PrintModes i);
     EscPosPrinter &operator<<(Justification i);
     EscPosPrinter &operator<<(Encoding i);
     EscPosPrinter &operator<<(_feed lines);
+    EscPosPrinter &operator<<(_lineSpacing mils);
+    EscPosPrinter &operator<<(_2CTable table);
     EscPosPrinter &operator<<(const char *s);
     EscPosPrinter &operator<<(const QByteArray &s);
     EscPosPrinter &operator<<(const QRCode &qr);
-    /*!
-     * The UTF-8 string will be encoded with QTextCodec
-     * if one of the Qt supported encodings is selected.
-     */
     EscPosPrinter &operator<<(const QString &text);
     EscPosPrinter &operator<<(QStringView text);
     EscPosPrinter &operator<<(void (*pf) ());
@@ -94,9 +108,22 @@ public:
     static void standardMode() {}
     static void pageMode() {}
 
+public Q_SLOTS:
+    void getStatus();
+
+private:
+    QTextCodec *m_codec = nullptr;
+    QIODevice *m_device;
+#ifdef Q_OS_WINDOWS
+    LPWSTR m_printerName;
+    DWORD  m_dwBytesWritten = 0L;
+    HANDLE m_hPrinter = NULL;
+    BOOL   m_bStatus = FALSE;
+    DWORD  m_dwJob = 0L;
+#endif
+    QByteArray decode(const QString &text);
     void write(const QByteArray &data);
     void write(const char *data, int size);
-
     EscPosPrinter &initialize();
     EscPosPrinter &encode(Encoding codec);
     EscPosPrinter &mode(PrintModes pm);
@@ -106,13 +133,8 @@ public:
     EscPosPrinter &printAndFeedPaper(quint8 n = 1);
     EscPosPrinter &align(Justification i);
     EscPosPrinter &paperFeed(int lines = 1);
-
-public Q_SLOTS:
-    void getStatus();
-
-private:
-    QTextCodec *m_codec = nullptr;
-    QIODevice *m_device;
+    EscPosPrinter &setLineSpacing(int mils);
+    EscPosPrinter &data2CTable(const QString &lColumn, const QString &rColumn);
 };
 
 }

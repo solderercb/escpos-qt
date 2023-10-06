@@ -13,7 +13,7 @@ set(escposqt_HEADERS_PRIVATE
 #     common.h
 )
 
-add_library(EscPosQt STATIC
+add_library(EscPosQt SHARED
     ${escposqt_SRC}
     ${escposqt_HEADERS}
     ${escposqt_HEADERS_PRIVATE}
@@ -29,6 +29,7 @@ endif()
 target_compile_definitions(EscPosQt
   PRIVATE
     PLUGINS_PREFER_DEBUG_POSTFIX=$<CONFIG:Debug>
+    EscPosQt5_EXPORTS
 )
 
 target_include_directories(EscPosQt PUBLIC
@@ -40,11 +41,16 @@ set_target_properties(EscPosQt PROPERTIES
     EXPORT_NAME Core
     VERSION ${PROJECT_VERSION}
     SOVERSION 0
+    PREFIX ""
+    AUTOMOC TRUE
 )
 
 target_link_libraries(EscPosQt
     PRIVATE
         Qt${QT_VERSION_MAJOR}::Core
+        Qt${QT_VERSION_MAJOR}::PrintSupport
+        kernel32
+        winspool
 )
 
 if(QT_VERSION_MAJOR GREATER_EQUAL 6)
